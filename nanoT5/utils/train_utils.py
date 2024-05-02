@@ -3,6 +3,7 @@ import time
 import evaluate
 from .logging_utils import Averager
 from datasets.iterable_dataset import IterableDataset
+import wandb
 
 
 def maybe_save_checkpoint(accelerator, args):
@@ -112,6 +113,8 @@ def eval(model, dataloader, logger, args, tokenizer):
 
     averager.update({'time': time.time() - args.last_log})
     averaged_stats = averager.average()
+    if args.wandb is not None:
+        wandb.log({"train_loss": averaged_stats["loss"]})
 
     logger.log_stats(
         stats=averaged_stats,
@@ -190,6 +193,8 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
             loss, stats = forward(model, batch)
             accelerator.backward(loss / args.optim.grad_acc)
             train_averager.update(stats)
+            if args.wandb is not None:
+                wandb.log({"train_loss": stats["loss"]})
 
             if batch_id % args.optim.grad_acc == 0:
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)

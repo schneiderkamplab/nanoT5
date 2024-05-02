@@ -1,11 +1,11 @@
 accelerate
-datasets >= 1.8.0
-sentencepiece != 0.1.92
+datasets
+sentencepiece
 transformers
 neptune
 pdbpp
 notebook
-protobuf==3.20.*
+protobuf
 pyyaml
 pynvml
 hydra-core
@@ -13,4 +13,6 @@ evaluate
 nltk
 absl-py
 rouge_score
-torch>=1.13.1,<=2.0.1
+torch
+bitlinear
+wandb

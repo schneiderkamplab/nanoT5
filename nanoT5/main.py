@@ -1,14 +1,17 @@
 from accelerate import Accelerator
 from omegaconf import open_dict
+import bitlinear
+import datetime
 import hydra
 import torch
 import time
+import wandb
 
 from .utils import (
     setup_basics,
     train,
     predict,
-    eval,
+    eval as _eval,
     get_lr_scheduler,
     get_optimizer,
     get_tokenizer,
@@ -44,6 +47,10 @@ def main(args):
         model, optimizer, lr_scheduler, train_dataloader, test_dataloader
     )
 
+    if args.bitlinear is not None:
+        bitlinear.replace_modules(model, new_class_kwargs={"measure": eval(args.bitlinear)})
+        print(model)
+
     if args.model.compile:
         model = torch.compile(model)
 
@@ -55,15 +62,24 @@ def main(args):
     if args.eval_only:
         model.eval()
         with torch.no_grad():
-            eval(model, test_dataloader, logger, args, tokenizer)
+            _eval(model, test_dataloader, logger, args, tokenizer)
     elif args.predict_only:
         model.eval()
         with torch.no_grad():
             predict(model, test_dataloader, logger,
                     args, tokenizer)
     else:
+        if args.wandb is not None:
+            if accelerator.is_main_process:
+                run_name = f"lr={args.base_lr} bl={args.bitlinear} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                wandb.init(project=args.wandb, name=run_name)
+            accelerator.wait_for_everyone()
         train(model, train_dataloader, test_dataloader, accelerator,
               lr_scheduler, optimizer, logger, args, tokenizer)
+        if args.wandb is not None:
+            if accelerator.is_main_process:
+                wandb.finish()
+            accelerator.wait_for_everyone()
 
     logger.finish()
 
