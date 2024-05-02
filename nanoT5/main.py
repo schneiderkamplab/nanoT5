@@ -62,7 +62,7 @@ def main(args):
     if args.eval_only:
         model.eval()
         with torch.no_grad():
-            _eval(model, test_dataloader, logger, args, tokenizer)
+            _eval(model, test_dataloader, logger, args, tokenizer, accelerator)
     elif args.predict_only:
         model.eval()
         with torch.no_grad():
@@ -70,14 +70,14 @@ def main(args):
                     args, tokenizer)
     else:
         if args.wandb is not None:
-            if accelerator.is_main_process:
+            if accelerator.is_main_process():
                 run_name = f"lr={args.base_lr} bl={args.bitlinear} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
                 wandb.init(project=args.wandb, name=run_name)
             accelerator.wait_for_everyone()
         train(model, train_dataloader, test_dataloader, accelerator,
               lr_scheduler, optimizer, logger, args, tokenizer)
         if args.wandb is not None:
-            if accelerator.is_main_process:
+            if accelerator.is_main_process():
                 wandb.finish()
             accelerator.wait_for_everyone()
 

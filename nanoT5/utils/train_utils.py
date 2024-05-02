@@ -15,7 +15,7 @@ def maybe_save_checkpoint(accelerator, args):
         accelerator.save_state(output_dir=output_dir)
 
 
-def maybe_eval_predict(model, dataloader, logger, args, tokenizer):
+def maybe_eval_predict(model, dataloader, logger, args, tokenizer, accelerator):
     if (
         args.current_train_step > args.optim.total_steps
         or args.current_train_step % args.eval.every_steps == 0
@@ -23,7 +23,7 @@ def maybe_eval_predict(model, dataloader, logger, args, tokenizer):
         model.eval()
 
         with torch.no_grad():
-            eval(model, dataloader, logger, args, tokenizer)
+            eval(model, dataloader, logger, args, tokenizer, accelerator)
 
             if args.mode == 'ft':
                 predict(
@@ -100,7 +100,7 @@ def forward(model, batch, calc_acc=False):
     return loss, stats
 
 
-def eval(model, dataloader, logger, args, tokenizer):
+def eval(model, dataloader, logger, args, tokenizer, accelerator):
     args.last_log = time.time()
     averager = Averager()
 
@@ -114,7 +114,9 @@ def eval(model, dataloader, logger, args, tokenizer):
     averager.update({'time': time.time() - args.last_log})
     averaged_stats = averager.average()
     if args.wandb is not None:
-        wandb.log({"train_loss": averaged_stats["loss"]})
+        if accelerator.is_main_process():
+            wandb.log({"eval_loss": averaged_stats["loss"]})
+        accelerator.wait_for_everyone()
 
     logger.log_stats(
         stats=averaged_stats,
@@ -193,10 +195,12 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
             loss, stats = forward(model, batch)
             accelerator.backward(loss / args.optim.grad_acc)
             train_averager.update(stats)
-            if args.wandb is not None:
-                wandb.log({"train_loss": stats["loss"]})
 
             if batch_id % args.optim.grad_acc == 0:
+                if args.wandb is not None:
+                    if accelerator.is_main_process():
+                        wandb.log({"train_loss": stats["loss"]})
+                    accelerator.wait_for_everyone()
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)
                 train_averager.update(stats)
 
@@ -205,7 +209,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                 optimizer.zero_grad(set_to_none=True)
 
                 maybe_logging(train_averager, args, model, optimizer, logger)
-                maybe_eval_predict(model, test_dataloader, logger, args, tokenizer)
+                maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator)
                 maybe_save_checkpoint(accelerator, args)
 
                 args.current_train_step += 1
