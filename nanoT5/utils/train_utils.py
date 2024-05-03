@@ -114,7 +114,7 @@ def eval(model, dataloader, logger, args, tokenizer, accelerator):
     averager.update({'time': time.time() - args.last_log})
     averaged_stats = averager.average()
     if args.wandb is not None:
-        if accelerator.is_main_process():
+        if accelerator.is_main_process:
             wandb.log({"eval_loss": averaged_stats["loss"]})
         accelerator.wait_for_everyone()
 
@@ -198,7 +198,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
 
             if batch_id % args.optim.grad_acc == 0:
                 if args.wandb is not None:
-                    if accelerator.is_main_process():
+                    if accelerator.is_main_process:
                         wandb.log({"train_loss": stats["loss"]})
                     accelerator.wait_for_everyone()
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)
