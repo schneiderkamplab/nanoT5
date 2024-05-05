@@ -180,6 +180,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
     model.train()
 
     train_averager = Averager()
+    step_averager = Averager()
 
     while args.current_train_step <= args.optim.total_steps:
         if isinstance(train_dataloader.dataset, IterableDataset):
@@ -195,11 +196,12 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
             loss, stats = forward(model, batch)
             accelerator.backward(loss / args.optim.grad_acc)
             train_averager.update(stats)
+            step_averager.update({"train_loss": stats["loss"]})
 
             if batch_id % args.optim.grad_acc == 0:
                 if args.wandb is not None:
                     if accelerator.is_main_process:
-                        wandb.log({"train_loss": stats["loss"]})
+                        wandb.log(step_averager.average())
                     accelerator.wait_for_everyone()
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)
                 train_averager.update(stats)
@@ -216,5 +218,5 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
 
         args.current_epoch += 1
 
-    maybe_eval_predict(model, test_dataloader, logger, args, tokenizer)
+    maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator)
     maybe_save_checkpoint(accelerator, args)
