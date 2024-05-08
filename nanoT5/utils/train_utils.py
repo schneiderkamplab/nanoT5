@@ -120,7 +120,7 @@ def eval(model, dataloader, logger, args, tokenizer, accelerator):
         accelerator.wait_for_everyone()
     if args.aim is not None:
         if accelerator.is_main_process:
-            aim.aim_run.track({"eval_loss": averaged_stats["loss"]})
+            aim.runner.track({"eval_loss": averaged_stats["loss"]})
         accelerator.wait_for_everyone()
 
     logger.log_stats(
@@ -210,7 +210,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                     accelerator.wait_for_everyone()
                 if args.aim is not None:
                     if accelerator.is_main_process:
-                        aim.aim_run.track(step_averager.average())
+                        aim.runner.track(step_averager.average())
                     accelerator.wait_for_everyone()
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)
                 train_averager.update(stats)
