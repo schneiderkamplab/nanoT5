@@ -10,8 +10,9 @@ precision: 'bf16'
 eval_only: false
 predict_only: false
 seed: 2137
-wandb: nanoT5 # null to deactivate
+wandb: null # null to deactivate
 bitlinear: null # torch.mean or torch.median or null to deactivate
+aim: null # null to deactivate
 
 model:
   klass: local_t5
