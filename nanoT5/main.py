@@ -6,6 +6,7 @@ import hydra
 import torch
 import time
 import wandb
+import aim
 
 from .utils import (
     setup_basics,
@@ -74,11 +75,20 @@ def main(args):
                 run_name = f"{args.model.name} lr={args.optim.base_lr} bl={args.bitlinear} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
                 wandb.init(project=args.wandb, name=run_name)
             accelerator.wait_for_everyone()
+        if args.aim is not None:
+            if accelerator.is_main_process:
+                run_name = f"{args.model.name} lr={args.optim.base_lr} bl={args.bitlinear} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                aim.aim_run = aim.Run(repo=args.aim, experiment=run_name)
+            accelerator.wait_for_everyone()
         train(model, train_dataloader, test_dataloader, accelerator,
               lr_scheduler, optimizer, logger, args, tokenizer)
         if args.wandb is not None:
             if accelerator.is_main_process:
                 wandb.finish()
+            accelerator.wait_for_everyone()
+        if args.wandb is not None:
+            if accelerator.is_main_process:
+                aim.aim_run.close()
             accelerator.wait_for_everyone()
 
     logger.finish()

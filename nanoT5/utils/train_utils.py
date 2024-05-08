@@ -4,6 +4,7 @@ import evaluate
 from .logging_utils import Averager
 from datasets.iterable_dataset import IterableDataset
 import wandb
+import aim
 
 
 def maybe_save_checkpoint(accelerator, args):
@@ -117,6 +118,10 @@ def eval(model, dataloader, logger, args, tokenizer, accelerator):
         if accelerator.is_main_process:
             wandb.log({"eval_loss": averaged_stats["loss"]})
         accelerator.wait_for_everyone()
+    if args.aim is not None:
+        if accelerator.is_main_process:
+            aim.aim_run.track({"eval_loss": averaged_stats["loss"]})
+        accelerator.wait_for_everyone()
 
     logger.log_stats(
         stats=averaged_stats,
@@ -202,6 +207,10 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                 if args.wandb is not None:
                     if accelerator.is_main_process:
                         wandb.log(step_averager.average())
+                    accelerator.wait_for_everyone()
+                if args.aim is not None:
+                    if accelerator.is_main_process:
+                        aim.aim_run.track(step_averager.average())
                     accelerator.wait_for_everyone()
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)
                 train_averager.update(stats)
