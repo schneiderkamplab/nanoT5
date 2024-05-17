@@ -11,8 +11,12 @@ eval_only: false
 predict_only: false
 seed: 2137
 wandb: null # null to deactivate
-bitlinear: null # torch.mean or torch.median or null to deactivate
 aim: null # null to deactivate
+
+bitlinear:
+  measure: null # torch.mean or torch.median or null to deactivate
+  weight_bits: 1.58
+  activation_bits: 8
 
 model:
   klass: local_t5
