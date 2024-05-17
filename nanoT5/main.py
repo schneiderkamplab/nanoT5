@@ -48,8 +48,12 @@ def main(args):
         model, optimizer, lr_scheduler, train_dataloader, test_dataloader
     )
 
-    if args.bitlinear is not None:
-        bitlinear.replace_modules(model, new_class_kwargs={"measure": eval(args.bitlinear)})
+    if args.bitlinear.measure is not None:
+        bitlinear.replace_modules(model, new_class_kwargs=dict(
+            measure=eval(args.bitlinear.measure),
+            weight_bits=args.bitlinear.weight_bits,
+            activation_bits=args.bitlinear.activation_bits,
+        ))
         print(model)
 
     if args.model.compile:
