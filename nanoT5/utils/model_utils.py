@@ -62,7 +62,7 @@ def get_config(args):
 
 def get_tokenizer(args):
     tokenizer = AutoTokenizer.from_pretrained(
-        args.model.name,
+        args.model.tokenizer,
         use_fast=True
     )
     tokenizer.model_max_length = int(1e9)
@@ -72,23 +72,36 @@ def get_tokenizer(args):
 
 def load_dataset_splits(args):
     if args.mode == 'pt':
-        dataset = datasets.load_dataset(
-            'c4',
-            'en',
-            streaming=True,
-        )
+        if args.data.dataset.endswith(".jsonl") or args.data.dataset.endswith(".json"):
+            dataset_train = datasets.load_dataset(
+                "json",
+                data_files=args.data.dataset,
+                streaming=True,
+            )
+            dataset_validation = datasets.load_dataset(
+                "json",
+                data_files=args.data.validation,
+                streaming=True,
+            )
+            dataset = datasets.IterableDatasetDict()
+            dataset["train"] = dataset_train["train"]
+            dataset["validation"] = dataset_validation["train"]
+        else:
+            dataset = datasets.load_dataset(
+                args.data.dataset,
+                args.data.language,
+                streaming=True,
+            )
 
-        dataset = dataset.remove_columns(
-            ['timestamp', 'url']
-        )
+        dataset = dataset.remove_columns(args.data.remove_columns)
 
         dataset_splits = {
             'train': dataset['train'],
-            'test': dataset['validation'],
+            'test': dataset['validation'] if 'validation' in dataset else dataset['train'],
         }
 
         assert (
-            dataset['train'].n_shards == 1024
+            dataset['train'].n_shards >= 1
         ), "We want to have many shards for efficient processing with num_workes in PyTorch dataloader"
     elif args.mode == 'ft':
         dataset_splits = datasets.load_dataset(

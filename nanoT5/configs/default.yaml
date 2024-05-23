@@ -11,8 +11,9 @@ eval_only: false
 predict_only: false
 seed: 2137
 wandb: null # null to deactivate
-bitlinear: null # torch.mean or torch.median or null to deactivate
 aim: null # null to deactivate
+
+bitlinear: [] # [] to deactivate
 
 model:
   klass: local_t5
@@ -24,17 +25,22 @@ model:
   checkpoint_path: ''
   random_init: true
   compile: true
+  tokenizer: 'google/t5-v1_1-base'
 
 data:
   input_length: 512
   mlm_probability: 0.15
   mean_noise_span_length: 3.0
   num_workers: 8
+  dataset: mc4
+  validation: null
+  language: en
+  remove_columns: [timestamp, url]
 
 optim:
   name: adamwscale
   base_lr: 2e-2
-  batch_size: 64
+  batch_size: 128
   total_steps: 65536
   epochs: -1 # If it's > 0 it overwrites total_steps
   warmup_steps: 10000
