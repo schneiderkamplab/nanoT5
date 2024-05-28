@@ -74,8 +74,8 @@ def main(args):
                 run_name = f"{args.model.name} lr={args.optim.base_lr} bl={args.bitlinear} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
                 wandb.init(project=args.wandb, name=run_name)
             accelerator.wait_for_everyone()
-        if args.aim is not None:
-            aimrun.init(repo=args.aim, experiment="nanoT5", args=args)
+        if args.aim.experiment is not None:
+            aimrun.init(repo=args.aim.repo, experiment=args.aim.experiment, args=args)
         train(model, train_dataloader, test_dataloader, accelerator,
               lr_scheduler, optimizer, logger, args, tokenizer)
         if args.wandb is not None:

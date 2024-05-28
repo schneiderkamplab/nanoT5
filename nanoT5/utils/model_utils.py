@@ -16,12 +16,14 @@ from .copied_utils import (
     DataCollatorForNI,
 )
 from .t5_model import MyT5
+from .t6_model import MyT6
 
 
 def get_model(args, config):
     klass = {
         'hf_t5': T5ForConditionalGeneration,
         'local_t5': MyT5,
+        'local_t6': MyT6,
     }[args.model.klass]
 
     if args.model.checkpoint_path:
