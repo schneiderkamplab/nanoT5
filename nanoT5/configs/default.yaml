@@ -11,7 +11,9 @@ eval_only: false
 predict_only: false
 seed: 2137
 wandb: null # null to deactivate
-aim: null # null to deactivate
+aim:
+  repo: aim:/localhost/
+  experiment: dfmT5 # null to deactivate
 
 bitlinear: [] # [] to deactivate
 
@@ -32,30 +34,134 @@ data:
   mlm_probability: 0.15
   mean_noise_span_length: 3.0
   num_workers: 8
-  dataset: mc4
-  validation: null
-  language: en
-  remove_columns: [timestamp, url]
+  dataset:
+  - ../../data/dfm3.1-train-00.jsonl
+  - ../../data/dfm3.1-train-01.jsonl
+  - ../../data/dfm3.1-train-02.jsonl
+  - ../../data/dfm3.1-train-03.jsonl
+  - ../../data/dfm3.1-train-04.jsonl
+  - ../../data/dfm3.1-train-05.jsonl
+  - ../../data/dfm3.1-train-06.jsonl
+  - ../../data/dfm3.1-train-07.jsonl
+  - ../../data/dfm3.1-train-08.jsonl
+  - ../../data/dfm3.1-train-09.jsonl
+  - ../../data/dfm3.1-train-10.jsonl
+  - ../../data/dfm3.1-train-11.jsonl
+  - ../../data/dfm3.1-train-12.jsonl
+  - ../../data/dfm3.1-train-13.jsonl
+  - ../../data/dfm3.1-train-14.jsonl
+  - ../../data/dfm3.1-train-15.jsonl
+  - ../../data/dfm3.1-train-16.jsonl
+  - ../../data/dfm3.1-train-17.jsonl
+  - ../../data/dfm3.1-train-18.jsonl
+  - ../../data/dfm3.1-train-19.jsonl
+  - ../../data/dfm3.1-train-20.jsonl
+  - ../../data/dfm3.1-train-21.jsonl
+  - ../../data/dfm3.1-train-22.jsonl
+  - ../../data/dfm3.1-train-23.jsonl
+  - ../../data/dfm3.1-train-24.jsonl
+  - ../../data/dfm3.1-train-25.jsonl
+  - ../../data/dfm3.1-train-26.jsonl
+  - ../../data/dfm3.1-train-27.jsonl
+  - ../../data/dfm3.1-train-28.jsonl
+  - ../../data/dfm3.1-train-29.jsonl
+  - ../../data/dfm3.1-train-30.jsonl
+  - ../../data/dfm3.1-train-31.jsonl
+  - ../../data/dfm3.1-train-32.jsonl
+  - ../../data/dfm3.1-train-33.jsonl
+  - ../../data/dfm3.1-train-34.jsonl
+  - ../../data/dfm3.1-train-35.jsonl
+  - ../../data/dfm3.1-train-36.jsonl
+  - ../../data/dfm3.1-train-37.jsonl
+  - ../../data/dfm3.1-train-38.jsonl
+  - ../../data/dfm3.1-train-39.jsonl
+  - ../../data/dfm3.1-train-40.jsonl
+  - ../../data/dfm3.1-train-41.jsonl
+  - ../../data/dfm3.1-train-42.jsonl
+  - ../../data/dfm3.1-train-43.jsonl
+  - ../../data/dfm3.1-train-44.jsonl
+  - ../../data/dfm3.1-train-45.jsonl
+  - ../../data/dfm3.1-train-46.jsonl
+  - ../../data/dfm3.1-train-47.jsonl
+  - ../../data/dfm3.1-train-48.jsonl
+  - ../../data/dfm3.1-train-49.jsonl
+  - ../../data/dfm3.1-train-50.jsonl
+  - ../../data/dfm3.1-train-51.jsonl
+  - ../../data/dfm3.1-train-52.jsonl
+  - ../../data/dfm3.1-train-53.jsonl
+  - ../../data/dfm3.1-train-54.jsonl
+  - ../../data/dfm3.1-train-55.jsonl
+  - ../../data/dfm3.1-train-56.jsonl
+  - ../../data/dfm3.1-train-57.jsonl
+  - ../../data/dfm3.1-train-58.jsonl
+  - ../../data/dfm3.1-train-59.jsonl
+  - ../../data/dfm3.1-train-60.jsonl
+  - ../../data/dfm3.1-train-61.jsonl
+  - ../../data/dfm3.1-train-62.jsonl
+  - ../../data/dfm3.1-train-63.jsonl
+  - ../../data/dfm3.1-train-64.jsonl
+  - ../../data/dfm3.1-train-65.jsonl
+  - ../../data/dfm3.1-train-66.jsonl
+  - ../../data/dfm3.1-train-67.jsonl
+  - ../../data/dfm3.1-train-68.jsonl
+  - ../../data/dfm3.1-train-69.jsonl
+  - ../../data/dfm3.1-train-70.jsonl
+  - ../../data/dfm3.1-train-71.jsonl
+  - ../../data/dfm3.1-train-72.jsonl
+  - ../../data/dfm3.1-train-73.jsonl
+  - ../../data/dfm3.1-train-74.jsonl
+  - ../../data/dfm3.1-train-75.jsonl
+  - ../../data/dfm3.1-train-76.jsonl
+  - ../../data/dfm3.1-train-77.jsonl
+  - ../../data/dfm3.1-train-78.jsonl
+  - ../../data/dfm3.1-train-79.jsonl
+  - ../../data/dfm3.1-train-80.jsonl
+  - ../../data/dfm3.1-train-81.jsonl
+  - ../../data/dfm3.1-train-82.jsonl
+  - ../../data/dfm3.1-train-83.jsonl
+  - ../../data/dfm3.1-train-84.jsonl
+  - ../../data/dfm3.1-train-85.jsonl
+  - ../../data/dfm3.1-train-86.jsonl
+  - ../../data/dfm3.1-train-87.jsonl
+  - ../../data/dfm3.1-train-88.jsonl
+  - ../../data/dfm3.1-train-89.jsonl
+  - ../../data/dfm3.1-train-90.jsonl
+  - ../../data/dfm3.1-train-91.jsonl
+  - ../../data/dfm3.1-train-92.jsonl
+  - ../../data/dfm3.1-train-93.jsonl
+  - ../../data/dfm3.1-train-94.jsonl
+  - ../../data/dfm3.1-train-95.jsonl
+  - ../../data/dfm3.1-train-96.jsonl
+  - ../../data/dfm3.1-train-97.jsonl
+  validation:
+  - ../../data/dfm3.1-validation-00.jsonl
+  - ../../data/dfm3.1-validation-01.jsonl
+  - ../../data/dfm3.1-validation-02.jsonl
+  - ../../data/dfm3.1-validation-03.jsonl
+  - ../../data/dfm3.1-validation-04.jsonl
+  - ../../data/dfm3.1-validation-05.jsonl
+  language: null
+  remove_columns: []
 
 optim:
   name: adamwscale
   base_lr: 2e-2
   batch_size: 128
-  total_steps: 65536
+  total_steps: 174820
   epochs: -1 # If it's > 0 it overwrites total_steps
   warmup_steps: 10000
   lr_scheduler: cosine
   weight_decay: 0.0
   grad_clip: 1.0
-  grad_acc: 2
+  grad_acc: 4
   final_cosine: 1e-5
 
 eval:
   every_steps: 100000 # Eval once in the end
-  steps: 500
+  steps: 9201
 
 checkpoint:
-  every_steps: 100000 # Save checkpoint once in the end
+  every_steps: 10000 # Save checkpoint once in the end
 
 logging:
   neptune: false
@@ -63,7 +169,7 @@ logging:
     project:
     api_token:
     tags: ''
-  every_steps: 100
+  every_steps: 1000
   grad_l2: true
   weights_l2: true
 
