@@ -295,7 +295,7 @@ class T6Block(nn.Module):
                     attention_mask=encoder_attention_mask,
                     position_bias=encoder_decoder_position_bias,
                 )
-                hidden_states = cross_attention_outputs[0]
+                hidden_states = cross_attention_outputs[0]+hidden_states
 
             # Keep relative position weights
             attention_outputs = attention_outputs + cross_attention_outputs[1:]
