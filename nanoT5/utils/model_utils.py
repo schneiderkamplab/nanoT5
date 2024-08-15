@@ -342,6 +342,12 @@ def get_lr_scheduler(optimizer, args, logger):
             name=args.optim.lr_scheduler,
             optimizer=optimizer,
         )
+    elif args.optim.lr_scheduler == 'schedulefree':
+        from schedulefree import AdamWScheduleFree
+        lr_scheduler = AdamWScheduleFree(
+            optimizer.param_groups,
+            lr=args.optim.base_lr,
+        )
     else:
         raise NotImplementedError
 
