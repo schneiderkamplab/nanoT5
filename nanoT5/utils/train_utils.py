@@ -7,21 +7,29 @@ import wandb
 import aimrun
 
 
-def maybe_save_checkpoint(accelerator, args):
+def maybe_save_checkpoint(model, accelerator, lr_scheduler, args):
     if (
         args.current_train_step > args.optim.total_steps
         or args.current_train_step % args.checkpoint.every_steps == 0
     ):
+        model.eval()
+        if hasattr(lr_scheduler, 'eval'):
+            lr_scheduler.eval()
         output_dir = f'checkpoint-{args.mode}-{args.current_train_step}'
         accelerator.save_state(output_dir=output_dir)
+        model.train()
+        if hasattr(lr_scheduler, 'train'):
+            lr_scheduler.train()
 
 
-def maybe_eval_predict(model, dataloader, logger, args, tokenizer, accelerator):
+def maybe_eval_predict(model, dataloader, logger, args, tokenizer, accelerator, lr_scheduler):
     if (
         args.current_train_step > args.optim.total_steps
         or args.current_train_step % args.eval.every_steps == 0
     ):
         model.eval()
+        if hasattr(lr_scheduler, 'eval'):
+            lr_scheduler.eval()
 
         with torch.no_grad():
             eval(model, dataloader, logger, args, tokenizer, accelerator)
@@ -33,7 +41,8 @@ def maybe_eval_predict(model, dataloader, logger, args, tokenizer, accelerator):
 
         args.last_log = time.time()
         model.train()
-
+        if hasattr(lr_scheduler, 'train'):
+            lr_scheduler.train()
 
 def maybe_logging(averager, args, model, optimizer, logger):
     if args.current_train_step % args.logging.every_steps == 0:
@@ -180,6 +189,8 @@ def predict(model, dataloader, logger, args, tokenizer):
 def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
           optimizer, logger, args, tokenizer):
     model.train()
+    if hasattr(lr_scheduler, 'train'):
+        lr_scheduler.train()
 
     train_averager = Averager()
     step_averager = Averager()
@@ -214,12 +225,12 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                 optimizer.zero_grad(set_to_none=True)
 
                 maybe_logging(train_averager, args, model, optimizer, logger)
-                maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator)
-                maybe_save_checkpoint(accelerator, args)
+                maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator, lr_scheduler)
+                maybe_save_checkpoint(model, accelerator, lr_scheduler, args)
 
                 args.current_train_step += 1
 
         args.current_epoch += 1
 
-    maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator)
-    maybe_save_checkpoint(accelerator, args)
+    maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator, lr_scheduler)
+    maybe_save_checkpoint(model, accelerator, lr_scheduler, args)

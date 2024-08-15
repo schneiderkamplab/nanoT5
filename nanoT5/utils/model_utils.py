@@ -74,7 +74,7 @@ def get_tokenizer(args):
 
 def load_dataset_splits(args):
     if args.mode == 'pt':
-        if args.data.dataset.endswith(".jsonl") or args.data.dataset.endswith(".json"):
+        if not isinstance(args.data.dataset, str) or args.data.dataset.endswith(".jsonl") or args.data.dataset.endswith(".json"):
             dataset_train = datasets.load_dataset(
                 "json",
                 data_files=args.data.dataset,
@@ -341,6 +341,12 @@ def get_lr_scheduler(optimizer, args, logger):
         lr_scheduler = get_scheduler(
             name=args.optim.lr_scheduler,
             optimizer=optimizer,
+        )
+    elif args.optim.lr_scheduler == 'schedulefree':
+        from schedulefree import AdamWScheduleFree
+        lr_scheduler = AdamWScheduleFree(
+            optimizer.param_groups,
+            lr=args.optim.base_lr,
         )
     else:
         raise NotImplementedError

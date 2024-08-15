@@ -11,7 +11,11 @@ eval_only: false
 predict_only: false
 seed: 2137
 wandb: null # null to deactivate
-aim: null # null to deactivate
+aim:
+  repo: aim:/localhost/
+  experiment: dfmT5 # null to deactivate
+  sync_repo: null
+  sync_args: {}
 
 bitlinear: [] # [] to deactivate
 
