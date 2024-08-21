@@ -84,6 +84,8 @@ class DataCollatorForT5MLM:
             )
 
         batch = {k: torch.from_numpy(v) for k, v in batch.items()}
+        batch["orig_input_ids"] = torch.from_numpy(input_ids)
+        assert torch.all(batch["orig_input_ids"][0] == torch.from_numpy(examples[0]["input_ids"]))
         return batch
 
     def create_sentinel_ids(self, mask_indices):

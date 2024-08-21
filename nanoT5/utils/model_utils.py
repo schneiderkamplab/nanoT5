@@ -2,7 +2,10 @@ import torch
 import datasets
 from torch.utils.data import DataLoader
 from omegaconf import open_dict
+from datasets import DatasetDict
 from datasets.iterable_dataset import IterableDataset
+from random import random
+from collections import defaultdict
 from transformers import (
     AutoTokenizer,
     T5ForConditionalGeneration,
@@ -188,10 +191,62 @@ def get_data_collator(tokenizer, config, args):
 
     return data_collator
 
+class FocusedIterableDataset(IterableDataset):
+    def __init__(self, dataset):
+        super().__init__(
+            ex_iterable=dataset._ex_iterable,
+            info=dataset._info,
+            split=dataset._split,
+            formatting=dataset._formatting,
+            shuffling=dataset._shuffling,
+            distributed=dataset._distributed,
+            token_per_repo_id=dataset._token_per_repo_id,
+            format_type="deprecated",
+        )
+        self.id2prob = defaultdict(lambda: 1.0)
+
+    def __iter__(self):
+        for i in super().__iter__():
+            if random() < self.id2prob[tuple(i['input_ids'])]:
+                yield i
+
+    def map(self, function, with_indices=False, input_columns=None, batched=False, batch_size=None, drop_last_batch=False, remove_columns=None, features=None, fn_kwargs=None):
+        return FocusedIterableDataset(super().map(
+            function=function,
+            with_indices=with_indices,
+            input_columns=input_columns,
+            batched=batched,
+            batch_size=batch_size,
+            drop_last_batch=drop_last_batch,
+            remove_columns=remove_columns,
+            features=features,
+            fn_kwargs=fn_kwargs,
+        ))
+    
+    def shuffle(self, seed=None, generator=None, buffer_size=None):
+        return FocusedIterableDataset(super().shuffle(
+            seed=seed,
+            generator=generator,
+            buffer_size=buffer_size,
+        ))
+
+    def __repr__(self):
+        return f"Focused{super().__repr__()}"
+
+class FocusedIterableDatasetDict(DatasetDict):
+    def __init__(self, dataset_dict):
+        super().__init__()
+        for split, dataset in dataset_dict.items():
+            self[split] = FocusedIterableDataset(dataset)
+
+    def __repr__(self):
+        return f"Focused{super().__repr__()}"
 
 def get_dataloaders(tokenizer, config, args):
     dataset_splits = load_dataset_splits(args)
     dataset = process_dataset(dataset_splits=dataset_splits, args=args, tokenizer=tokenizer)
+    dataset = FocusedIterableDatasetDict(dataset)
+    print(dataset)
     data_collator = get_data_collator(tokenizer=tokenizer, config=config,
                                       args=args)
 

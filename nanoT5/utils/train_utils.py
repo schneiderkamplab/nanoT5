@@ -118,6 +118,7 @@ def eval(model, dataloader, logger, args, tokenizer, accelerator):
         if batch_id == args.eval.corrected_steps * args.optim.grad_acc:
             break
 
+        orig_ids = batch.pop("orig_input_ids", None)
         _, stats = forward(model, batch, calc_acc=True)
         averager.update(stats)
 
@@ -195,7 +196,13 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
     train_averager = Averager()
     step_averager = Averager()
 
+    running_loss = []
+
     while args.current_train_step <= args.optim.total_steps:
+        print("starting epoch")
+        probs = train_dataloader.dataset.id2prob.values()
+        if probs:
+            print(min(probs), sum(probs)/len(probs), sorted(probs)[int(len(probs)/2)], max(probs))
         if isinstance(train_dataloader.dataset, IterableDataset):
             train_dataloader.dataset.set_epoch(args.current_epoch)
 
@@ -206,7 +213,29 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
             if args.current_train_step > args.optim.total_steps:
                 break
 
+            orig_ids = batch.pop("orig_input_ids", None)
             loss, stats = forward(model, batch)
+            if len(running_loss) >= 4:
+                running_loss.pop(0)
+            running_loss.append(loss.item())
+            if args.data.decay is not None:
+                print(loss.item(), sum(running_loss)/len(running_loss), loss.item() < args.data.decay*sum(running_loss)/len(running_loss))
+            for example, example_batch in zip(orig_ids, batch["input_ids"]):
+                example = tuple(example.tolist())
+                if example not in train_dataloader.dataset.id2prob:
+                    print(f"orig: {tokenizer.decode(example)}")
+                    print(f"batch: {tokenizer.decode(example_batch)}")
+                    for i, ids in enumerate(train_dataloader.dataset.id2prob):
+                        print(f"{i}: {tokenizer.decode(ids)}")
+                    1/0
+                if args.data.decay is not None and loss.item() < args.data.decay*sum(running_loss)/len(running_loss):
+                    train_dataloader.dataset.id2prob[example] *= loss.item() / sum(running_loss) * len(running_loss)
+                    if train_dataloader.dataset.id2prob[example] < args.data.decay_min:
+                        train_dataloader.dataset.id2prob[example] = args.data.decay_min
+                if args.data.decay is not None and loss.item() > sum(running_loss)/len(running_loss)/args.data.decay:
+                    train_dataloader.dataset.id2prob[example] *= loss.item() / sum(running_loss) * len(running_loss)
+                    if train_dataloader.dataset.id2prob[example] > 1.00:
+                        train_dataloader.dataset.id2prob[example] = 1.00
             accelerator.backward(loss / args.optim.grad_acc)
             train_averager.update(stats)
             step_averager.update({"train_loss": stats["loss"]})
