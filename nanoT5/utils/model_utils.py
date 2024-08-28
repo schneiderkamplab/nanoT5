@@ -192,7 +192,6 @@ def get_data_collator(tokenizer, config, args):
 def get_dataloaders(tokenizer, config, args):
     dataset_splits = load_dataset_splits(args)
     dataset = process_dataset(dataset_splits=dataset_splits, args=args, tokenizer=tokenizer)
-    dataset = SamplingIterableDatasetDict(dataset, sampling_prob=args.data.sampling_prob)
     data_collator = get_data_collator(tokenizer=tokenizer, config=config,
                                       args=args)
 
