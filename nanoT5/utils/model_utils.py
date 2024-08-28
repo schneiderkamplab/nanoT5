@@ -221,7 +221,7 @@ class SamplingIterableDataset(IterableDataset):
             features=features,
             fn_kwargs=fn_kwargs,
         ), sampling_prob=self.sampling_prob)
-    
+
     def shuffle(self, seed=None, generator=None, buffer_size=None):
         return SamplingIterableDataset(super().shuffle(
             seed=seed,
