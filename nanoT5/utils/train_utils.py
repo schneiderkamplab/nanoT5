@@ -233,7 +233,6 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                 args.current_train_step += 1
 
         args.current_epoch += 1
-        train_dataloader.dataset.sampling_prob = max(0.0, min(1.0, train_dataloader.dataset.sampling_prob * args.data.sampling_prob_factor))
 
     maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator, lr_scheduler)
     maybe_save_checkpoint(model, accelerator, lr_scheduler, args)
