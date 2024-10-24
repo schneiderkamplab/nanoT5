@@ -59,6 +59,7 @@ def get_config(args):
             assert not hasattr(config, k), f'config already has attribute {k}'
             setattr(config, k, v)
 
+    print(config)
     return config
 
 
@@ -299,7 +300,7 @@ def get_lr_scheduler(optimizer, args, logger):
             optimizer,
             schedulers=[scheduler1, scheduler2],
             milestones=[args.optim.warmup_steps]
-        )
+        ) if args.optim.warmup_steps > 0 else scheduler2
     elif args.optim.lr_scheduler == 'legacy':
         import math
         from torch.optim.lr_scheduler import (

@@ -5,7 +5,8 @@ from .logging_utils import Averager
 from datasets.iterable_dataset import IterableDataset
 import wandb
 import aimrun
-
+from bitlinear import bitlinearize, set_lambda_
+import math
 
 def maybe_save_checkpoint(model, accelerator, lr_scheduler, args):
     if (
@@ -205,6 +206,33 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
         for batch_id, batch in enumerate(train_dataloader, start=1):
             if args.current_train_step > args.optim.total_steps:
                 break
+
+            # Set quantization rate lambda_.
+            if args.quantization_warmup_steps is not None:
+                current_step = args.current_train_step-args.quantization_warmup_offset
+                if current_step < 0:
+                    if args.current_train_step % args.logging.every_steps == 0 and batch_id % args.optim.grad_acc == 0:
+                        print(f"Waiting for quantization warmup from {args.quantization_warmup_offset} at step {args.current_train_step} steps, setting lambda_ to 0.0.")
+                    set_lambda_(model, lambda_=0.0)
+                elif current_step == 0:
+                    if args.quantization_warmup_prequantize:
+                        print(f"Model was pre-quantized to bitlinear - doing nothing at step {args.current_train_step}, steeing lambda_ to 0.0.")
+                    else:
+                        bitlinearize(model, replacements=args.bitlinear)
+                        print(f"Quantized to bitlinear at step {args.current_train_step}, setting lambda_ to 0.0.")
+                    set_lambda_(model, lambda_=0.0)
+                elif current_step < args.quantization_warmup_steps:
+                    def sigmoid(x):
+                        return 1 / (1 + math.exp(-x))
+                    lambda_ = 2*(sigmoid(current_step*5/args.quantization_warmup_steps))-1
+                    if args.current_train_step % args.logging.every_steps == 0 and batch_id % args.optim.grad_acc == 0:
+                        print(f"Setting lambda_ to {lambda_} for step {args.current_train_step}.")
+                    set_lambda_(model, lambda_=lambda_)
+                elif current_step == args.quantization_warmup_steps:
+                    #if args.current_train_step % args.logging.every_steps == 0 and batch_id % args.optim.grad_acc == 0:
+                    print(f"Finishing warmup at step {args.current_train_step}, setting lambda_ to 1.0.")
+                    set_lambda_(model, lambda_=1.0)
+                    print(model)
 
             loss, stats = forward(model, batch)
             accelerator.backward(loss / args.optim.grad_acc)

@@ -1,6 +1,6 @@
 from accelerate import Accelerator
 from omegaconf import open_dict
-from bitlinear import bitlinearize
+from bitlinear import bitlinearize, set_lambda_
 import datetime
 import hydra
 import torch
@@ -31,6 +31,13 @@ def main(args):
     logger = setup_basics(accelerator, args)
     config = get_config(args)
     model = get_model(args, config)
+    if args.quantization_warmup_steps is not None:
+        if args.quantization_warmup_offset == 0 or args.quantization_warmup_prequantize:
+            bitlinearize(model, replacements=args.bitlinear)
+            print(f"Quantized to bitlinear at step 0, setting lambda_ to 0.0.")
+            set_lambda_(model, lambda_=0.0)
+    print(model)
+
     tokenizer = get_tokenizer(args)
     optimizer = get_optimizer(model, args)
     lr_scheduler = get_lr_scheduler(optimizer, args, logger)
@@ -47,9 +54,6 @@ def main(args):
     ) = accelerator.prepare(
         model, optimizer, lr_scheduler, train_dataloader, test_dataloader
     )
-
-    bitlinearize(model, replacements=args.bitlinear)
-    print(model)
 
     if args.model.compile:
         model = torch.compile(model)
