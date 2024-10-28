@@ -1,4 +1,5 @@
 import torch
+import os.path
 import datasets
 from torch.utils.data import DataLoader
 from omegaconf import open_dict
@@ -8,6 +9,7 @@ from transformers import (
     T5ForConditionalGeneration,
     AutoConfig,
 )
+import safetensors.torch
 
 from .copied_utils import (
     compute_input_and_target_lengths,
@@ -26,9 +28,12 @@ def get_model(args, config):
         'local_t6': MyT6,
     }[args.model.klass]
 
-    if args.model.checkpoint_path:
+    if args.model.checkpoint_path and args.model.load_weights:
         model = klass(config)
-        model.load_state_dict(torch.load(args.model.checkpoint_path))
+        state_dict = safetensors.torch.load_file(os.path.join(args.model.checkpoint_path, 'model.safetensors'))
+        state_dict['encoder.embed_tokens.weight'] = state_dict['shared.weight']
+        state_dict['decoder.embed_tokens.weight'] = state_dict['shared.weight']
+        model.load_state_dict(state_dict)
     elif args.model.random_init:
         model = klass(config)
     else:
@@ -271,6 +276,10 @@ def get_optimizer(model, args):
     else:
         raise NotImplementedError
 
+    if args.model.checkpoint_path and args.load_optimizer:
+        state_dict = torch.load(os.path.join(args.model.checkpoint_path, 'optimizer.bin'))
+        optimizer.load_state_dict(state_dict)
+
     return optimizer
 
 
@@ -351,5 +360,9 @@ def get_lr_scheduler(optimizer, args, logger):
         )
     else:
         raise NotImplementedError
+
+    if args.model.checkpoint_path and args.model.load_scheduler:
+        state_dict = torch.load(os.path.join(args.model.checkpoint_path, 'scheduler.bin'))
+        lr_scheduler.load_state_dict(state_dict)
 
     return lr_scheduler
