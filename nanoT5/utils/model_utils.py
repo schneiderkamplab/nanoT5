@@ -276,7 +276,7 @@ def get_optimizer(model, args):
     else:
         raise NotImplementedError
 
-    if args.model.checkpoint_path and args.load_optimizer:
+    if args.model.checkpoint_path and args.model.load_optimizer:
         state_dict = torch.load(os.path.join(args.model.checkpoint_path, 'optimizer.bin'))
         optimizer.load_state_dict(state_dict)
 
