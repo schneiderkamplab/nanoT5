@@ -273,12 +273,22 @@ def get_optimizer(model, args):
             lr=args.optim.base_lr,
             relative_step=False,
         )
+    elif args.optim.name == 'adamwschedulefree':
+        from schedulefree import AdamWScheduleFree
+        optimizer = AdamWScheduleFree(
+            optimizer_grouped_parameters,
+            lr=args.optim.base_lr,
+        )
     else:
         raise NotImplementedError
 
     if args.model.checkpoint_path and args.model.load_optimizer:
         state_dict = torch.load(os.path.join(args.model.checkpoint_path, 'optimizer.bin'))
         optimizer.load_state_dict(state_dict)
+
+    if args.optim.schedulefree_wrapper:
+        from schedulefree import ScheduleFreeWrapper
+        optimizer = ScheduleFreeWrapper(optimizer)
 
     return optimizer
 
@@ -351,12 +361,6 @@ def get_lr_scheduler(optimizer, args, logger):
         lr_scheduler = get_scheduler(
             name=args.optim.lr_scheduler,
             optimizer=optimizer,
-        )
-    elif args.optim.lr_scheduler == 'schedulefree':
-        from schedulefree import AdamWScheduleFree
-        lr_scheduler = AdamWScheduleFree(
-            optimizer.param_groups,
-            lr=args.optim.base_lr,
         )
     else:
         raise NotImplementedError

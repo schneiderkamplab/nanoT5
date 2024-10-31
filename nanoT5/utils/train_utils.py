@@ -8,29 +8,29 @@ import aimrun
 from bitlinear import bitlinearize, set_lambda_
 import math
 
-def maybe_save_checkpoint(model, accelerator, lr_scheduler, args):
+def maybe_save_checkpoint(model, accelerator, optimizer, args):
     if (
         args.current_train_step > args.optim.total_steps
         or args.current_train_step % args.checkpoint.every_steps == 0
     ):
         model.eval()
-        if hasattr(lr_scheduler, 'eval'):
-            lr_scheduler.eval()
+        if args.optim.name == 'adamwschedulefree':
+            optimizer.eval()
         output_dir = f'checkpoint-{args.mode}-{args.current_train_step}'
         accelerator.save_state(output_dir=output_dir)
         model.train()
-        if hasattr(lr_scheduler, 'train'):
-            lr_scheduler.train()
+        if args.optim.name == 'adamwschedulefree':
+            optimizer.train()
 
 
-def maybe_eval_predict(model, dataloader, logger, args, tokenizer, accelerator, lr_scheduler):
+def maybe_eval_predict(model, dataloader, logger, args, tokenizer, accelerator, optimizer):
     if (
         args.current_train_step > args.optim.total_steps
         or args.current_train_step % args.eval.every_steps == 0
     ):
         model.eval()
-        if hasattr(lr_scheduler, 'eval'):
-            lr_scheduler.eval()
+        if args.optim.name == 'adamwschedulefree':
+            optimizer.eval()
 
         with torch.no_grad():
             eval(model, dataloader, logger, args, tokenizer, accelerator)
@@ -42,8 +42,8 @@ def maybe_eval_predict(model, dataloader, logger, args, tokenizer, accelerator, 
 
         args.last_log = time.time()
         model.train()
-        if hasattr(lr_scheduler, 'train'):
-            lr_scheduler.train()
+        if args.optim.name == 'adamwschedulefree':
+            optimizer.train()
 
 def maybe_logging(averager, args, model, optimizer, logger):
     if args.current_train_step % args.logging.every_steps == 0:
@@ -128,7 +128,7 @@ def eval(model, dataloader, logger, args, tokenizer, accelerator):
         if accelerator.is_main_process:
             wandb.log({"eval_loss": averaged_stats["loss"]})
         accelerator.wait_for_everyone()
-    aimrun.track({"eval_loss": averaged_stats["loss"]})
+    aimrun.track({"eval_loss": averaged_stats["loss"]}, step=args.current_train_step, epoch=args.current_epoch)
 
     logger.log_stats(
         stats=averaged_stats,
@@ -190,8 +190,22 @@ def predict(model, dataloader, logger, args, tokenizer):
 def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
           optimizer, logger, args, tokenizer):
     model.train()
-    if hasattr(lr_scheduler, 'train'):
-        lr_scheduler.train()
+    if args.optim.name == 'adamwschedulefree':
+        optimizer.train()
+
+    print(f"Skipping {args.optim.skip_steps} steps.")
+    while args.current_train_step <= args.optim.skip_steps:
+        for batch_id, batch in enumerate(train_dataloader, start=1):
+            if args.current_train_step > args.optim.skip_steps:
+                break
+            if batch_id % args.optim.grad_acc == 0:
+                args.current_train_step += 1
+                if args.current_train_step % args.logging.every_steps == 0:
+                    print(f"Skipping step {args.current_train_step}.")
+        else:
+            print(f"At end of epoch {args.current_epoch} after {args.current_train_step} skipped steps.")
+            args.current_epoch += 1
+    print(f"Skipping done, starting at step {args.current_train_step}.")
 
     train_averager = Averager()
     step_averager = Averager()
@@ -244,7 +258,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                     if accelerator.is_main_process:
                         wandb.log(step_averager.average())
                     accelerator.wait_for_everyone()
-                aimrun.track(step_averager.average())
+                aimrun.track(step_averager.average(), step=args.current_train_step, epoch=args.current_epoch)
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)
                 train_averager.update(stats)
 
@@ -253,12 +267,12 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                 optimizer.zero_grad(set_to_none=True)
 
                 maybe_logging(train_averager, args, model, optimizer, logger)
-                maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator, lr_scheduler)
-                maybe_save_checkpoint(model, accelerator, lr_scheduler, args)
+                maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator, optimizer)
+                maybe_save_checkpoint(model, accelerator, optimizer, args)
 
                 args.current_train_step += 1
 
         args.current_epoch += 1
 
-    maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator, lr_scheduler)
-    maybe_save_checkpoint(model, accelerator, lr_scheduler, args)
+    maybe_eval_predict(model, test_dataloader, logger, args, tokenizer, accelerator, optimizer)
+    maybe_save_checkpoint(model, accelerator, optimizer, args)

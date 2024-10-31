@@ -17,3 +17,5 @@ torch
 bitlinear
 wandb
 aim
+aimrun
+schedulefree
