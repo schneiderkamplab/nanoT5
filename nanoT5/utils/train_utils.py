@@ -193,19 +193,41 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
     if args.optim.name == 'adamwschedulefree':
         optimizer.train()
 
-    print(f"Skipping {args.optim.skip_steps} steps.")
-    while args.current_train_step <= args.optim.skip_steps:
-        for batch_id, batch in enumerate(train_dataloader, start=1):
-            if args.current_train_step > args.optim.skip_steps:
-                break
-            if batch_id % args.optim.grad_acc == 0:
-                args.current_train_step += 1
-                if args.current_train_step % args.logging.every_steps == 0:
-                    print(f"Skipping step {args.current_train_step}.")
-        else:
-            print(f"At end of epoch {args.current_epoch} after {args.current_train_step} skipped steps.")
-            args.current_epoch += 1
-    print(f"Skipping done, starting at step {args.current_train_step}.")
+    if args.optim.skip_steps > 0:
+        print(f"Skipping {args.optim.skip_steps} steps.")
+        while args.current_train_step <= args.optim.skip_steps:
+            for batch_id, batch in enumerate(train_dataloader, start=1):
+                if args.current_train_step > args.optim.skip_steps:
+                    break
+                if batch_id % args.optim.grad_acc == 0:
+                    args.current_train_step += 1
+                    if args.current_train_step % args.logging.every_steps == 0:
+                        print(f"Skipping step {args.current_train_step}.")
+            else:
+                print(f"At end of epoch {args.current_epoch} after {args.current_train_step} skipped steps.")
+                args.current_epoch += 1
+        print(f"Skipping done, starting at step {args.current_train_step}.")
+        if args.quantization_warmup_steps is not None:
+            current_step = args.current_train_step-args.quantization_warmup_offset
+            if current_step == 0:
+                if args.quantization_warmup_prequantize:
+                    print(f"Model was pre-quantized to bitlinear - doing nothing at step {args.current_train_step}, steeing lambda_ to 0.0.")
+                else:
+                    bitlinearize(model, replacements=args.bitlinear)
+                    print(f"Quantized to bitlinear at step {args.current_train_step}, setting lambda_ to 0.0.")
+                set_lambda_(model, lambda_=0.0)
+            elif current_step < args.quantization_warmup_steps:
+                def sigmoid(x):
+                    return 1 / (1 + math.exp(-x))
+                lambda_ = 2*(sigmoid(current_step*5/args.quantization_warmup_steps))-1
+                if args.current_train_step % args.logging.every_steps == 0 and batch_id % args.optim.grad_acc == 0:
+                    print(f"Setting lambda_ to {lambda_} for step {args.current_train_step}.")
+                set_lambda_(model, lambda_=lambda_)
+            elif current_step >= args.quantization_warmup_steps:
+                #if args.current_train_step % args.logging.every_steps == 0 and batch_id % args.optim.grad_acc == 0:
+                print(f"Finishing warmup at step {args.current_train_step}, setting lambda_ to 1.0.")
+                set_lambda_(model, lambda_=1.0)
+                print(model)
 
     train_averager = Averager()
     step_averager = Averager()

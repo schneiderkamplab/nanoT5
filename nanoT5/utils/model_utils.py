@@ -21,7 +21,7 @@ from .t5_model import MyT5
 from .t6_model import MyT6
 
 
-def get_model(args, config):
+def get_model(args, config, logger):
     klass = {
         'hf_t5': T5ForConditionalGeneration,
         'local_t5': MyT5,
@@ -30,10 +30,12 @@ def get_model(args, config):
 
     if args.model.checkpoint_path and args.model.load_weights:
         model = klass(config)
-        state_dict = safetensors.torch.load_file(os.path.join(args.model.checkpoint_path, 'model.safetensors'))
+        model_path = os.path.join(args.model.checkpoint_path, 'model.safetensors')
+        state_dict = safetensors.torch.load_file(model_path)
         state_dict['encoder.embed_tokens.weight'] = state_dict['shared.weight']
         state_dict['decoder.embed_tokens.weight'] = state_dict['shared.weight']
         model.load_state_dict(state_dict)
+        logger.log_message(f'Loaded model from {model_path}')
     elif args.model.random_init:
         model = klass(config)
     else:
@@ -240,7 +242,7 @@ def get_dataloaders(tokenizer, config, args):
     return dataloaders['train'], dataloaders['test']
 
 
-def get_optimizer(model, args):
+def get_optimizer(model, args, logger):
     no_decay = ["bias", "LayerNorm", "layernorm", "layer_norm", "ln"]
 
     optimizer_grouped_parameters = [
@@ -283,8 +285,10 @@ def get_optimizer(model, args):
         raise NotImplementedError
 
     if args.model.checkpoint_path and args.model.load_optimizer:
-        state_dict = torch.load(os.path.join(args.model.checkpoint_path, 'optimizer.bin'))
+        optimizer_path = os.path.join(args.model.checkpoint_path, 'optimizer.bin')
+        state_dict = torch.load(optimizer_path)
         optimizer.load_state_dict(state_dict)
+        logger.log_message(f'Loaded optimizer from {optimizer_path}')
 
     if args.optim.schedulefree_wrapper:
         from schedulefree import ScheduleFreeWrapper

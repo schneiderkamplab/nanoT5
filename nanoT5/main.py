@@ -30,7 +30,7 @@ def main(args):
     )
     logger = setup_basics(accelerator, args)
     config = get_config(args)
-    model = get_model(args, config)
+    model = get_model(args, config, logger)
     if args.quantization_warmup_steps is not None:
         if args.quantization_warmup_offset == 0 or args.quantization_warmup_prequantize:
             bitlinearize(model, replacements=args.bitlinear)
@@ -39,7 +39,7 @@ def main(args):
     print(model)
 
     tokenizer = get_tokenizer(args)
-    optimizer = get_optimizer(model, args)
+    optimizer = get_optimizer(model, args, logger)
     lr_scheduler = get_lr_scheduler(optimizer, args, logger)
     train_dataloader, test_dataloader = get_dataloaders(tokenizer, config, args)
 
