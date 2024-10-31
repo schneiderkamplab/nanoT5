@@ -193,7 +193,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
     if args.optim.name == 'adamwschedulefree':
         optimizer.train()
 
-    if args.optim.skip_steps > 0:
+    if hasattr(args.optim, "skip_steps") and args.optim.skip_steps > 0:
         print(f"Skipping {args.optim.skip_steps} steps.")
         while args.current_train_step <= args.optim.skip_steps:
             for batch_id, batch in enumerate(train_dataloader, start=1):
