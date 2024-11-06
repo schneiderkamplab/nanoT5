@@ -12,10 +12,7 @@ from torch.nn import CrossEntropyLoss
 from transformers.modeling_utils import ModuleUtilsMixin
 from transformers.modeling_outputs import ModelOutput
 from transformers.models.t5.configuration_t5 import T5Config
-from transformers.models.t5.modeling_t5 import (
-    T5LayerNorm,
-    T5DenseGatedActDense,
-)
+from transformers.models.t5.modeling_t5 import ACT2FN
 
 
 @dataclass
@@ -30,36 +27,53 @@ class Seq2SeqLMOutput(ModelOutput):
     logits: torch.FloatTensor = None
     encoder_outputs: EncoderOutput = None
 
-class T6Config(T5Config):
-    def __init__(self, **kwargs):
-        self.multiple_crossattention = kwargs.pop('multiple_crossattention', 1)
-        super().__init__(**kwargs)
 
-class T6LayerNorm(T5LayerNorm):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+class T5DenseGatedActDense(nn.Module):
+    def __init__(self, config: T5Config):
+        super().__init__()
+        self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias=False)
+        self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias=False)
+        self.wo = nn.Linear(config.d_ff, config.d_model, bias=False)
+        self.dropout = nn.Dropout(config.dropout_rate)
+        self.act = ACT2FN[config.dense_act_fn]
 
-class T6DenseGatedActDense(T5DenseGatedActDense):
-    def __init__(self, config: T6Config):
-        super().__init__(config)
+    def forward(self, hidden_states):
+        hidden_gelu = self.act(self.wi_0(hidden_states))
+        hidden_linear = self.wi_1(hidden_states)
+        hidden_states = hidden_gelu * hidden_linear
+        hidden_states = self.dropout(hidden_states)
 
-class T6LayerFF(nn.Module):
-    def __init__(self, config: T6Config):
+        # To make 8bit quantization work for google/flan-t5-xxl, self.wo is kept in float32.
+        # See https://github.com/huggingface/transformers/issues/20287
+        # we also make sure the weights are not in `int8` in case users will force `_keep_in_fp32_modules` to be `None``
+        if (
+            isinstance(self.wo.weight, torch.Tensor)
+            and hidden_states.dtype != self.wo.weight.dtype
+            and self.wo.weight.dtype != torch.int8
+        ):
+            hidden_states = hidden_states.to(self.wo.weight.dtype)
+
+        hidden_states = torch.layer_norm(hidden_states, hidden_states.size()[1:]).type_as(hidden_states)
+        hidden_states = self.wo(hidden_states)
+        return hidden_states
+
+
+class T5LayerFF(nn.Module):
+    def __init__(self, config: T5Config):
         super().__init__()
         assert config.is_gated_act
-        self.DenseReluDense = T6DenseGatedActDense(config)
-        self.layer_norm = T6LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
+        self.DenseReluDense = T5DenseGatedActDense(config)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(self, hidden_states):
-        forwarded_states = self.layer_norm(hidden_states).type_as(hidden_states)
+        forwarded_states = torch.layer_norm(hidden_states, hidden_states.size()[1:]).type_as(hidden_states)
         forwarded_states = self.DenseReluDense(forwarded_states)
         hidden_states = hidden_states + self.dropout(forwarded_states)
         return hidden_states
 
 
-class T6Attention(nn.Module):
-    def __init__(self, config: T6Config, has_relative_attention_bias=False):
+class T5Attention(nn.Module):
+    def __init__(self, config: T5Config, has_relative_attention_bias=False):
         super().__init__()
         self.is_decoder = config.is_decoder
         self.has_relative_attention_bias = has_relative_attention_bias
@@ -202,16 +216,16 @@ class T6Attention(nn.Module):
         )  # (batch_size, n_heads, seq_length, key_length)
 
         attn_output = unshape(torch.matmul(attn_weights, value_states))  # (batch_size, seq_length, dim)
+        attn_output = torch.layer_norm(attn_output, attn_output.size()[1:]).type_as(attn_output)
         attn_output = self.o(attn_output)
 
         return (attn_output, position_bias)
 
 
-class T6LayerSelfAttention(nn.Module):
+class T5LayerSelfAttention(nn.Module):
     def __init__(self, config, has_relative_attention_bias=False):
         super().__init__()
-        self.SelfAttention = T6Attention(config, has_relative_attention_bias=has_relative_attention_bias)
-        self.layer_norm = T6LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
+        self.SelfAttention = T5Attention(config, has_relative_attention_bias=has_relative_attention_bias)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(
@@ -220,7 +234,7 @@ class T6LayerSelfAttention(nn.Module):
         attention_mask=None,
         position_bias=None,
     ):
-        normed_hidden_states = self.layer_norm(hidden_states).type_as(hidden_states)
+        normed_hidden_states = torch.layer_norm(hidden_states, hidden_states.size()[1:]).type_as(hidden_states)
         attention_output = self.SelfAttention(
             normed_hidden_states,
             mask=attention_mask,
@@ -231,11 +245,10 @@ class T6LayerSelfAttention(nn.Module):
         return outputs
 
 
-class T6LayerCrossAttention(nn.Module):
+class T5LayerCrossAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.EncDecAttention = T6Attention(config, has_relative_attention_bias=False)
-        self.layer_norm = T6LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
+        self.EncDecAttention = T5Attention(config, has_relative_attention_bias=False)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(
@@ -245,7 +258,7 @@ class T6LayerCrossAttention(nn.Module):
         attention_mask=None,
         position_bias=None,
     ):
-        normed_hidden_states = self.layer_norm(hidden_states)
+        normed_hidden_states = torch.layer_norm(hidden_states, hidden_states.size()[1:])
         attention_output = self.EncDecAttention(
             normed_hidden_states,
             mask=attention_mask,
@@ -257,18 +270,16 @@ class T6LayerCrossAttention(nn.Module):
         return outputs
 
 
-class T6Block(nn.Module):
+class T5Block(nn.Module):
     def __init__(self, config, has_relative_attention_bias=False):
         super().__init__()
         self.is_decoder = config.is_decoder
-        self.multiple_crossattention = config.multiple_crossattention
         self.layer = nn.ModuleList()
-        self.layer.append(T6LayerSelfAttention(config, has_relative_attention_bias=has_relative_attention_bias))
+        self.layer.append(T5LayerSelfAttention(config, has_relative_attention_bias=has_relative_attention_bias))
         if self.is_decoder:
-            for _ in range(self.multiple_crossattention):
-                self.layer.append(T6LayerCrossAttention(config))
+            self.layer.append(T5LayerCrossAttention(config))
 
-        self.layer.append(T6LayerFF(config))
+        self.layer.append(T5LayerFF(config))
     
     def forward(
         self,
@@ -288,14 +299,13 @@ class T6Block(nn.Module):
         attention_outputs = self_attention_outputs[1:]  # Relative position weights
 
         if self.is_decoder and encoder_hidden_states is not None:
-            for _ in range(self.multiple_crossattention):
-                cross_attention_outputs = self.layer[1](
-                    hidden_states,
-                    key_value_states=encoder_hidden_states,
-                    attention_mask=encoder_attention_mask,
-                    position_bias=encoder_decoder_position_bias,
-                )
-                hidden_states = cross_attention_outputs[0]+hidden_states
+            cross_attention_outputs = self.layer[1](
+                hidden_states,
+                key_value_states=encoder_hidden_states,
+                attention_mask=encoder_attention_mask,
+                position_bias=encoder_decoder_position_bias,
+            )
+            hidden_states = cross_attention_outputs[0]
 
             # Keep relative position weights
             attention_outputs = attention_outputs + cross_attention_outputs[1:]
@@ -309,7 +319,7 @@ class T6Block(nn.Module):
         return outputs  # hidden-states, (self-attention position bias), (cross-attention position bias)
 
 
-class T6Stack(nn.Module, ModuleUtilsMixin):
+class T5Stack(nn.Module, ModuleUtilsMixin):
     def __init__(self, config, embed_tokens):
         super().__init__()
         assert embed_tokens is not None
@@ -319,10 +329,9 @@ class T6Stack(nn.Module, ModuleUtilsMixin):
         self.is_decoder = config.is_decoder
 
         self.block = nn.ModuleList(
-            [T6Block(config, has_relative_attention_bias=bool(i == 0)) for i in range(config.num_layers)]
+            [T5Block(config, has_relative_attention_bias=bool(i == 0)) for i in range(config.num_layers)]
         )
 
-        self.final_layer_norm = T6LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(
@@ -386,7 +395,7 @@ class T6Stack(nn.Module, ModuleUtilsMixin):
             if self.is_decoder and encoder_hidden_states is not None:
                 encoder_decoder_position_bias = layer_outputs[2]
         
-        hidden_states = self.final_layer_norm(hidden_states).type_as(hidden_states)
+        hidden_states = torch.layer_norm(hidden_states, hidden_states.size()[1:]).type_as(hidden_states)
         hidden_states = self.dropout(hidden_states)
 
         return EncoderOutput(
@@ -396,7 +405,7 @@ class T6Stack(nn.Module, ModuleUtilsMixin):
 
 
 class MyT6(nn.Module):
-    def __init__(self, config: T6Config):
+    def __init__(self, config: T5Config):
         super().__init__()
         config.is_encoder_decoder = False
         assert not config.tie_word_embeddings
@@ -407,13 +416,12 @@ class MyT6(nn.Module):
 
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
-        self.encoder = T6Stack(encoder_config, self.shared)
+        self.encoder = T5Stack(encoder_config, self.shared)
 
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
         decoder_config.num_layers = config.num_decoder_layers
-        decoder_config.multiple_crossattention = 2
-        self.decoder = T6Stack(decoder_config, self.shared)
+        self.decoder = T5Stack(decoder_config, self.shared)
 
         self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
         self.generation_config = None
@@ -513,18 +521,16 @@ class MyT6(nn.Module):
 
     def _init_weights(self, module):
         factor = self.config.initializer_factor  # Used for testing weights initialization
-        if isinstance(module, T6LayerNorm):
-            module.weight.data.fill_(factor * 1.0)
-        elif isinstance(module, (MyT6)):
+        if isinstance(module, (MyT6)):
             module.shared.weight.data.normal_(mean=0.0, std=factor * 1.0)
             if hasattr(module, "lm_head") and not self.config.tie_word_embeddings:
                 module.lm_head.weight.data.normal_(mean=0.0, std=factor * 1.0)
-        elif isinstance(module, T6DenseGatedActDense):
+        elif isinstance(module, T5DenseGatedActDense):
             d_ff, d_model = module.wi_0.weight.data.size()
             module.wi_0.weight.data.normal_(mean=0.0, std=factor * ((d_model) ** -0.5))
             module.wi_1.weight.data.normal_(mean=0.0, std=factor * ((d_model) ** -0.5))
             module.wo.weight.data.normal_(mean=0.0, std=factor * ((d_ff) ** -0.5))
-        elif isinstance(module, T6Attention):
+        elif isinstance(module, T5Attention):
             d_model = self.config.d_model
             key_value_proj_dim = self.config.d_kv
             n_heads = self.config.num_heads

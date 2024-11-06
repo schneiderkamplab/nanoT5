@@ -96,7 +96,7 @@ def extra_stats(args, model, optimizer):
     return stats
 
 
-def forward(model, batch, calc_acc=False):
+def forward(model, batch, args, tokenizer, calc_acc):
     outputs = model(**batch)
     loss = outputs.loss
 
@@ -107,6 +107,11 @@ def forward(model, batch, calc_acc=False):
         correct = (outputs.logits.argmax(-1) == batch["labels"]).sum().item()
         accuracy = correct / batch["labels"].numel()
         stats['accuracy'] = accuracy
+
+    if args.current_train_step % args.eval.every_steps == 0:
+        print(f"INPUT    : {tokenizer.decode(batch['input_ids'][0])}")
+        print(f"LABEL    : {tokenizer.decode(batch['labels'][0])}")
+        print(f"PREDICTED: {tokenizer.decode(outputs.logits.argmax(-1)[0])}")
 
     return loss, stats
 
@@ -119,7 +124,7 @@ def eval(model, dataloader, logger, args, tokenizer, accelerator):
         if batch_id == args.eval.corrected_steps * args.optim.grad_acc:
             break
 
-        _, stats = forward(model, batch, calc_acc=True)
+        _, stats = forward(model, batch, args, tokenizer, calc_acc=True)
         averager.update(stats)
 
     averager.update({'time': time.time() - args.last_log})
@@ -270,10 +275,10 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                     set_lambda_(model, lambda_=1.0)
                     print(model)
 
-            loss, stats = forward(model, batch)
+            loss, stats = forward(model, batch, args, tokenizer, calc_acc=True)
             accelerator.backward(loss / args.optim.grad_acc)
             train_averager.update(stats)
-            step_averager.update({"train_loss": stats["loss"]})
+            step_averager.update({"train_loss": stats["loss"], "train_accuracy": stats["accuracy"]})
 
             if batch_id % args.optim.grad_acc == 0:
                 if args.wandb is not None:
