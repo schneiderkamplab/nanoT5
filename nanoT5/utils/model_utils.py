@@ -66,7 +66,6 @@ def get_config(args):
             assert not hasattr(config, k), f'config already has attribute {k}'
             setattr(config, k, v)
 
-    print(config)
     return config
 
 
@@ -280,6 +279,13 @@ def get_optimizer(model, args, logger):
         optimizer = AdamWScheduleFree(
             optimizer_grouped_parameters,
             lr=args.optim.base_lr,
+        )
+    elif args.optim.name == 'adopt':
+        from .adopt import ADOPT
+        optimizer = ADOPT(
+            optimizer_grouped_parameters,
+            lr=args.optim.base_lr,
+            decoupled=True,
         )
     else:
         raise NotImplementedError

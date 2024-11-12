@@ -258,7 +258,7 @@ class T5LayerCrossAttention(nn.Module):
         attention_mask=None,
         position_bias=None,
     ):
-        normed_hidden_states = torch.layer_norm(hidden_states, hidden_states.size()[1:])
+        normed_hidden_states = torch.layer_norm(hidden_states, hidden_states.size()[1:]).type_as(hidden_states)
         attention_output = self.EncDecAttention(
             normed_hidden_states,
             mask=attention_mask,
