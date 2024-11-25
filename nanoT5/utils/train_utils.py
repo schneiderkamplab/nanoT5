@@ -7,6 +7,7 @@ import wandb
 import aimrun
 from bitlinear import bitlinearize, set_lambda_
 import math
+from .t11_model import T5SequenceNorm
 
 def maybe_save_checkpoint(model, accelerator, optimizer, args):
     if (
@@ -60,6 +61,20 @@ def maybe_logging(averager, args, model, optimizer, logger):
         )
 
         args.last_log = time.time()
+
+        # gather_running_statistics(model)
+
+def gather_running_statistics(model, prefix="", stats=dict()):
+    for name, module in model.named_children():
+        qual_name = prefix + "." + name
+        module.__qualname__ = qual_name
+        if isinstance(module, T5SequenceNorm):
+            stats[qual_name + ".mean"] = module.running_mean
+            stats[qual_name + ".var"] = module.running_var
+        else:
+            gather_running_statistics(module, prefix=qual_name, stats=stats)
+    return stats
+
 
 
 def maybe_grad_clip_and_grad_calc(accelerator, model, args):

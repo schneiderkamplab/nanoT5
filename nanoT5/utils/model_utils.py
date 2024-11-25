@@ -19,6 +19,12 @@ from .copied_utils import (
 )
 from .t5_model import MyT5
 from .t6_model import MyT6
+from .t7_model import MyT7
+from .t8_model import MyT8
+from .t9_model import MyT9
+from .t10_model import MyT10
+from .t11_model import MyT11
+from .t12_model import MyT12
 
 
 def get_model(args, config, logger):
@@ -26,6 +32,12 @@ def get_model(args, config, logger):
         'hf_t5': T5ForConditionalGeneration,
         'local_t5': MyT5,
         'local_t6': MyT6,
+        'local_t7': MyT7,
+        'local_t8': MyT8,
+        'local_t9': MyT9,
+        'local_t10': MyT10,
+        'local_t11': MyT11,
+        'local_t12': MyT12,
     }[args.model.klass]
 
     if args.model.checkpoint_path and args.model.load_weights:
