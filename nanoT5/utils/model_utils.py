@@ -85,21 +85,21 @@ def load_dataset_splits(args):
             dataset_train = datasets.load_dataset(
                 "json",
                 data_files=args.data.dataset,
-                streaming=True,
+                streaming=args.data.streaming,
             )
             dataset_validation = datasets.load_dataset(
                 "json",
                 data_files=args.data.validation,
-                streaming=True,
+                streaming=args.data.streaming,
             )
-            dataset = datasets.IterableDatasetDict()
+            dataset = datasets.IterableDatasetDict() if args.data.streaming else datasets.DatasetDict()
             dataset["train"] = dataset_train["train"]
             dataset["validation"] = dataset_validation["train"]
         else:
             dataset = datasets.load_dataset(
                 args.data.dataset,
                 args.data.language,
-                streaming=True,
+                streaming=args.data.streaming,
             )
 
         dataset = dataset.remove_columns(args.data.remove_columns)
