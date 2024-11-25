@@ -100,6 +100,7 @@ def load_dataset_splits(args):
                 args.data.dataset,
                 args.data.language,
                 streaming=True,
+                trust_remote_code=True,
             )
 
         dataset = dataset.remove_columns(args.data.remove_columns)
