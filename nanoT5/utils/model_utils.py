@@ -19,6 +19,12 @@ from .copied_utils import (
 )
 from .t5_model import MyT5
 from .t6_model import MyT6
+from .t7_model import MyT7
+from .t8_model import MyT8
+from .t9_model import MyT9
+from .t10_model import MyT10
+from .t11_model import MyT11
+from .t12_model import MyT12
 
 
 def get_model(args, config, logger):
@@ -26,6 +32,12 @@ def get_model(args, config, logger):
         'hf_t5': T5ForConditionalGeneration,
         'local_t5': MyT5,
         'local_t6': MyT6,
+        'local_t7': MyT7,
+        'local_t8': MyT8,
+        'local_t9': MyT9,
+        'local_t10': MyT10,
+        'local_t11': MyT11,
+        'local_t12': MyT12,
     }[args.model.klass]
 
     if args.model.checkpoint_path and args.model.load_weights:
@@ -85,21 +97,21 @@ def load_dataset_splits(args):
             dataset_train = datasets.load_dataset(
                 "json",
                 data_files=args.data.dataset,
-                streaming=True,
+                streaming=args.data.streaming,
             )
             dataset_validation = datasets.load_dataset(
                 "json",
                 data_files=args.data.validation,
-                streaming=True,
+                streaming=args.data.streaming,
             )
-            dataset = datasets.IterableDatasetDict()
+            dataset = datasets.IterableDatasetDict() if args.data.streaming else datasets.DatasetDict()
             dataset["train"] = dataset_train["train"]
             dataset["validation"] = dataset_validation["train"]
         else:
             dataset = datasets.load_dataset(
                 args.data.dataset,
                 args.data.language,
-                streaming=True,
+                streaming=args.data.streaming,
                 trust_remote_code=True,
             )
 

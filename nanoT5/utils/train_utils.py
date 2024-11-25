@@ -7,6 +7,7 @@ import wandb
 import aimrun
 from bitlinear import bitlinearize, set_lambda_
 import math
+from .t11_model import T5SequenceNorm
 
 def maybe_save_checkpoint(model, accelerator, optimizer, args):
     if (
@@ -61,6 +62,20 @@ def maybe_logging(averager, args, model, optimizer, logger):
 
         args.last_log = time.time()
 
+        # gather_running_statistics(model)
+
+def gather_running_statistics(model, prefix="", stats=dict()):
+    for name, module in model.named_children():
+        qual_name = prefix + "." + name
+        module.__qualname__ = qual_name
+        if isinstance(module, T5SequenceNorm):
+            stats[qual_name + ".mean"] = module.running_mean
+            stats[qual_name + ".var"] = module.running_var
+        else:
+            gather_running_statistics(module, prefix=qual_name, stats=stats)
+    return stats
+
+
 
 def maybe_grad_clip_and_grad_calc(accelerator, model, args):
     if args.optim.grad_clip > 0:
@@ -96,7 +111,7 @@ def extra_stats(args, model, optimizer):
     return stats
 
 
-def forward(model, batch, args, tokenizer, calc_acc):
+def forward(model, batch, args, tokenizer, calc_acc, eval):
     outputs = model(**batch)
     loss = outputs.loss
 
@@ -109,9 +124,10 @@ def forward(model, batch, args, tokenizer, calc_acc):
         stats['accuracy'] = accuracy
 
     if args.current_train_step % args.eval.every_steps == 0:
-        print(f"INPUT    : {tokenizer.decode(batch['input_ids'][0])}")
-        print(f"LABEL    : {tokenizer.decode(batch['labels'][0])}")
-        print(f"PREDICTED: {tokenizer.decode(outputs.logits.argmax(-1)[0])}")
+        # print(f"INPUT    : {tokenizer.decode(batch['input_ids'][0])}")
+        # print(f"LABEL    : {tokenizer.decode(batch['labels'][0])}")
+        # print(f"PREDICTED: {tokenizer.decode(outputs.logits.argmax(-1)[0])}")
+        pass
 
     return loss, stats
 
@@ -120,15 +136,16 @@ def eval(model, dataloader, logger, args, tokenizer, accelerator):
     args.last_log = time.time()
     averager = Averager()
 
-    for batch_id, batch in enumerate(dataloader, start=1):
+    for batch_id, batch in enumerate(dataloader, start=0):
         if batch_id == args.eval.corrected_steps * args.optim.grad_acc:
             break
 
-        _, stats = forward(model, batch, args, tokenizer, calc_acc=True)
+        _, stats = forward(model, batch, args, tokenizer, calc_acc=True, eval=True)
         averager.update(stats)
 
     averager.update({'time': time.time() - args.last_log})
     averaged_stats = averager.average()
+    # print(f"averaged_stats: {averaged_stats}")
     if args.wandb is not None:
         if accelerator.is_main_process:
             wandb.log({"eval_loss": averaged_stats["loss"]})
@@ -165,6 +182,7 @@ def predict(model, dataloader, logger, args, tokenizer):
         )
         predictions = decode(predictions)
         references = decode(batch["labels"])
+        # print('\n'.join(repr(x) for x in zip(predictions, references)))
 
         # If we are in a multiprocess environment, the last batch has duplicates
         if step == len(dataloader) - 1:
@@ -275,7 +293,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                     set_lambda_(model, lambda_=1.0)
                     print(model)
 
-            loss, stats = forward(model, batch, args, tokenizer, calc_acc=True)
+            loss, stats = forward(model, batch, args, tokenizer, calc_acc=True, eval=False)
             accelerator.backward(loss / args.optim.grad_acc)
             train_averager.update(stats)
             step_averager.update({"train_loss": stats["loss"], "train_accuracy": stats["accuracy"]})
