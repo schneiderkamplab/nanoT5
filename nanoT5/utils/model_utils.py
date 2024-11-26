@@ -167,7 +167,7 @@ def process_dataset(dataset_splits, args, tokenizer):
                 },
                 remove_columns=['text'],
             )
-            extra_kwargs = {'buffer_size': 10_000} if isinstance(dataset_split, datasets.IterableDataset) else {}
+            extra_kwargs = {'buffer_size': 10_000} if isinstance(dataset_split, IterableDataset) else {}
             dataset_split = dataset_split.shuffle(seed=args.seed, **extra_kwargs)
             final_datasets[split] = dataset_split
     elif args.mode == 'ft':
@@ -222,12 +222,7 @@ def get_dataloaders(tokenizer, config, args):
     for split in ['train', 'test']:
         batch_size = args.optim.batch_size // args.optim.grad_acc
 
-        shuffle = (split == 'train') and not is_iterable
-
-        if args.mode == 'ft' and split == 'train':
-            assert shuffle is True
-        else:
-            assert shuffle is False
+        shuffle = (split == 'train') and args.mode == 'ft'
 
         dataloaders[split] = DataLoader(
             dataset[split],
