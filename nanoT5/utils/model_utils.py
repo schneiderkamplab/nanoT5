@@ -167,7 +167,7 @@ def process_dataset(dataset_splits, args, tokenizer):
                 },
                 remove_columns=['text'],
             )
-            extra_kwargs = {'buffer_size': 10_000} if isinstance(dataset_split, datasets.IterableDatasetDataset) else {}
+            extra_kwargs = {'buffer_size': 10_000} if isinstance(dataset_split, datasets.IterableDataset) else {}
             dataset_split = dataset_split.shuffle(seed=args.seed, **extra_kwargs)
             final_datasets[split] = dataset_split
     elif args.mode == 'ft':
