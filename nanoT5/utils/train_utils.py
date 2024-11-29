@@ -256,6 +256,8 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
     step_averager = Averager()
 
     while args.current_train_step <= args.optim.total_steps:
+        # debugging only
+        print(f"starting epoch with sampling probability {train_dataloader.dataset.sampling_prob}")
         if isinstance(train_dataloader.dataset, IterableDataset):
             train_dataloader.dataset.set_epoch(args.current_epoch)
 

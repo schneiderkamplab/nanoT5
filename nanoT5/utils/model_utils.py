@@ -208,6 +208,56 @@ def get_data_collator(tokenizer, config, args):
 
     return data_collator
 
+class SamplingIterableDataset(IterableDataset):
+    def __init__(self, dataset, sampling_prob = 1.0):
+        super().__init__(
+            ex_iterable=dataset._ex_iterable,
+            info=dataset._info,
+            split=dataset._split,
+            formatting=dataset._formatting,
+            shuffling=dataset._shuffling,
+            distributed=dataset._distributed,
+            token_per_repo_id=dataset._token_per_repo_id,
+            format_type="deprecated",
+        )
+        self.sampling_prob = sampling_prob
+
+    def __iter__(self):
+        for i in super().__iter__():
+            if random() < self.sampling_prob:
+                yield i
+
+    def map(self, function, with_indices=False, input_columns=None, batched=False, batch_size=None, drop_last_batch=False, remove_columns=None, features=None, fn_kwargs=None):
+        return SamplingIterableDataset(super().map(
+            function=function,
+            with_indices=with_indices,
+            input_columns=input_columns,
+            batched=batched,
+            batch_size=batch_size,
+            drop_last_batch=drop_last_batch,
+            remove_columns=remove_columns,
+            features=features,
+            fn_kwargs=fn_kwargs,
+        ), sampling_prob=self.sampling_prob)
+
+    def shuffle(self, seed=None, generator=None, buffer_size=None):
+        return SamplingIterableDataset(super().shuffle(
+            seed=seed,
+            generator=generator,
+            buffer_size=buffer_size,
+        ), sampling_prob=self.sampling_prob)
+
+    def __repr__(self):
+        return f"Sampling{super().__repr__()[:-1]}, sampling_prob={self.sampling_prob})"
+
+class SamplingIterableDatasetDict(DatasetDict):
+    def __init__(self, dataset_dict, sampling_prob = 1.0):
+        super().__init__()
+        for split, dataset in dataset_dict.items():
+            self[split] = SamplingIterableDataset(dataset, sampling_prob)
+
+    def __repr__(self):
+        return f"Sampling{super().__repr__()[-1]})"
 
 def get_dataloaders(tokenizer, config, args):
     dataset_splits = load_dataset_splits(args)
