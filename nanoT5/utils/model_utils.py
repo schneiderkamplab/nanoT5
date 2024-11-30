@@ -311,7 +311,7 @@ def get_optimizer(model, args, logger):
     return optimizer
 
 
-def get_lr_scheduler(optimizer, args, logger):
+def get_lr_scheduler(optimizer, args, logger, accelerator):
     if args.optim.lr_scheduler == 'cosine':
         from torch.optim.lr_scheduler import (
             SequentialLR,
@@ -323,20 +323,20 @@ def get_lr_scheduler(optimizer, args, logger):
             optimizer,
             start_factor=0.5,
             end_factor=1,
-            total_iters=args.optim.warmup_steps,
+            total_iters=args.optim.warmup_steps * accelerator.num_processes,
             last_epoch=-1,
         )
 
         scheduler2 = CosineAnnealingLR(
             optimizer,
-            T_max=args.optim.total_steps - args.optim.warmup_steps,
+            T_max=(args.optim.total_steps - args.optim.warmup_steps) * accelerator.num_processes,
             eta_min=args.optim.final_cosine,
         )
 
         lr_scheduler = SequentialLR(
             optimizer,
             schedulers=[scheduler1, scheduler2],
-            milestones=[args.optim.warmup_steps]
+            milestones=[args.optim.warmup_steps * accelerator.num_processes]
         ) if args.optim.warmup_steps > 0 else scheduler2
     elif args.optim.lr_scheduler == 'legacy':
         import math
