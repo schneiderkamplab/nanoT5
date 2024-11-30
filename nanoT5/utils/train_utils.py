@@ -299,16 +299,17 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
             step_averager.update({"train_loss": stats["loss"], "train_accuracy": stats["accuracy"]})
 
             if batch_id % args.optim.grad_acc == 0:
+                avg_stats = step_averager.average()
                 if args.wandb is not None:
                     if accelerator.is_main_process:
-                        wandb.log(step_averager.average())
+                        wandb.log(avg_stats)
                     accelerator.wait_for_everyone()
-                aimrun.track(step_averager.average(), step=args.current_train_step, epoch=args.current_epoch)
+                aimrun.track(avg_stats, step=args.current_train_step, epoch=args.current_epoch)
                 stats = maybe_grad_clip_and_grad_calc(accelerator, model, args)
                 train_averager.update(stats)
 
                 optimizer.step()
-                lr_scheduler.step() if args.optim.lr_scheduler != 'reduce_on_plateau' else lr_scheduler.step(step_averager.average()["train_loss"])
+                lr_scheduler.step() if args.optim.lr_scheduler != 'reduce_on_plateau' else lr_scheduler.step(avg_stats["train_loss"])
                 optimizer.zero_grad(set_to_none=True)
 
                 maybe_logging(train_averager, args, model, optimizer, logger)
