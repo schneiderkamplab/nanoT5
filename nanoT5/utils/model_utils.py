@@ -380,6 +380,20 @@ def get_lr_scheduler(optimizer, args, logger):
             name=args.optim.lr_scheduler,
             optimizer=optimizer,
         )
+    elif args.optim.lr_scheduler == 'reduce_on_plateau':
+        from torch.optim.lr_scheduler import ReduceLROnPlateau
+        lr_scheduler = ReduceLROnPlateau(
+            optimizer,
+            mode='min',
+            factor=0.8,
+            patience=1024,
+            verbose=True,
+            threshold=1e-5,
+            threshold_mode='rel',
+            cooldown=0,
+            min_lr=1e-8,
+            eps=1e-8,
+        )
     else:
         raise NotImplementedError
 

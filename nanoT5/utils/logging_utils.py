@@ -81,7 +81,7 @@ class Logger:
                 self.neptune_logger[f'{prefix}{k}'].log(v, step=step)
 
         msg_start = f'[{prefix[:-1]}] Step {step} out of {args.optim.total_steps}' + ' | '
-        dict_msg = ' | '.join([f'{k.capitalize()} --> {v:.3f}' for k, v in stats.items()]) + ' | '
+        dict_msg = ' | '.join([f'{k.capitalize()} --> {v:.6f}' for k, v in stats.items()]) + ' | '
 
         msg = msg_start + dict_msg
 
