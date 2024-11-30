@@ -386,11 +386,11 @@ def get_lr_scheduler(optimizer, args, logger, accelerator):
             optimizer,
             mode='min',
             factor=0.8,
-            patience=1024,
+            patience=1024 * accelerator.num_processes,
             verbose=True,
             threshold=1e-5,
             threshold_mode='rel',
-            cooldown=0,
+            cooldown=1024 * accelerator.num_processes,
             min_lr=1e-8,
             eps=1e-8,
         )
