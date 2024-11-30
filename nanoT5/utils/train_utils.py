@@ -308,7 +308,7 @@ def train(model, train_dataloader, test_dataloader, accelerator, lr_scheduler,
                 train_averager.update(stats)
 
                 optimizer.step()
-                lr_scheduler.step() if args.optim.name != 'reduce_on_plateau' else lr_scheduler.step(train_averager.average()["loss"])
+                lr_scheduler.step() if args.optim.lr_scheduler != 'reduce_on_plateau' else lr_scheduler.step(step_averager.average()["loss"])
                 optimizer.zero_grad(set_to_none=True)
 
                 maybe_logging(train_averager, args, model, optimizer, logger)
