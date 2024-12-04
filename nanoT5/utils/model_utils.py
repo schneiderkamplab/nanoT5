@@ -1,3 +1,4 @@
+import gc
 import torch
 import os.path
 import datasets
@@ -301,6 +302,9 @@ def get_optimizer(model, args, logger):
     if args.model.checkpoint_path and args.model.load_optimizer:
         optimizer_path = os.path.join(args.model.checkpoint_path, 'optimizer.bin')
         state_dict = torch.load(optimizer_path)
+        optimizer.state = {}
+        gc.collect()
+        torch.cuda.empty_cache()
         optimizer.load_state_dict(state_dict)
         logger.log_message(f'Loaded optimizer from {optimizer_path}')
 
